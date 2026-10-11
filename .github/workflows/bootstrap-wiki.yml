@@ -1,0 +1,33 @@
+name: Bootstrap wiki
+
+on:
+  push:
+    branches:
+      - "wiki-bootstrap"
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout wiki repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+
+      - name: Copy files
+        run: cp -r wiki-seed/. wiki/
+
+      - name: Commit & Push changes
+        uses: actions-js/push@master
+        with:
+          directory: "wiki"
+          repository: ${{ github.repository }}.wiki
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          message: "添加表情列表与生成脚本"
+          branch: "master"
