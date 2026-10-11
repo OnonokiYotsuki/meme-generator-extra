@@ -6,9 +6,15 @@
 
 ## 表情列表
 
-| 关键词 | 名称 | 图片数 | 选项 |
-| ------ | ---- | ------ | ---- |
-| 猫摇 | `neko_shake` | 1 | `--circle` / `圆`：将图片变为圆形 |
+表情详细信息、表情预览等可以在 [--> 表情列表 <--](docs/表情列表.md) 查看
+
+新增或修改表情后，在 `config.toml` 中设置 `load_builtin_memes = false` 并把 `meme_dirs` 指向本仓库的 `memes`（否则内置表情也会被列进来），然后运行下面的命令重新生成列表和预览图：
+
+```bash
+python docs/update_meme_list.py
+```
+
+> 预览图已存在时不会重新生成，修改表情后需先删除 `docs/images` 和 `docs/thumbs` 中对应的图片
 
 ## 使用方式
 
