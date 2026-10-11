@@ -1,43 +1,16 @@
 # `meme-generator` 额外表情仓库
 
-此仓库为 表情包生成器 [meme-generator](https://github.com/MemeCrafters/meme-generator) 的个人额外表情仓库，结构参照 [meme-generator-contrib](https://github.com/MemeCrafters/meme-generator-contrib)
+此仓库为 表情包生成器 [meme-generator](https://github.com/MemeCrafters/meme-generator) 的额外表情包仓库
 
-适用于 Python 版 `meme-generator`（0.1.x）
+用于放置一些自己制作的表情，可自行取用
 
 ## 表情列表
 
-表情详细信息、表情预览等可以在 [--> 表情列表 <--](docs/表情列表.md) 查看
-
-新增或修改表情后，在 `config.toml` 中设置 `load_builtin_memes = false` 并把 `meme_dirs` 指向本仓库的 `memes`（否则内置表情也会被列进来），然后运行下面的命令重新生成列表和预览图：
-
-```bash
-python docs/update_meme_list.py
-```
-
-> 预览图已存在时不会重新生成，修改表情后需先删除 `docs/images` 和 `docs/thumbs` 中对应的图片
+表情详细信息、表情预览等可以在 [--> 表情列表 <--](https://github.com/OnonokiYotsuki/meme-generator-extra/wiki/%E8%A1%A8%E6%83%85%E5%88%97%E8%A1%A8) 查看
 
 ## 使用方式
 
 参考 [`meme-generator` 加载其他表情的方式](https://github.com/MemeCrafters/meme-generator/wiki/%E5%8A%A0%E8%BD%BD%E5%85%B6%E4%BB%96%E8%A1%A8%E6%83%85)
-
-在 `meme_generator` 的配置文件 `config.toml` 中添加本仓库的 `memes` 目录：
-
-```toml
-[meme]
-meme_dirs = ["D:/Code/Bots/meme-generator-extra/memes"]
-```
-
-## 添加新表情
-
-在 `memes/` 下新建一个以表情名命名的文件夹，包含：
-
-```
-memes/<meme_name>/
-├── __init__.py   # 表情函数，并调用 add_meme 注册
-└── images/       # 表情所用素材
-```
-
-素材路径统一写成 `Path(__file__).parent / "images"`
 
 ## 声明
 
