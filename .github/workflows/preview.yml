@@ -1,0 +1,185 @@
+name: Preview memes
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "memes/**"
+      - ".github/workflows/preview.yml"
+      - ".github/scripts/preview_memes.py"
+  workflow_dispatch:
+    inputs:
+      memes:
+        description: "要预览的表情目录名，空格分隔（留空则预览全部）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PREVIEW_BRANCH: meme-preview
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+        with:
+          repository: MemeCrafters/meme-generator
+          ref: v0.1.14
+          path: main
+          sparse-checkout: resources/fonts
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip3 install -U meme_generator==0.1.14
+
+      - name: Install fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-color-emoji libegl1 libgl1
+          sudo mkdir -p /usr/share/fonts/myfonts
+          sudo cp main/resources/fonts/* /usr/share/fonts/myfonts/
+          fc-cache -fv
+
+      - name: Change config
+        run: |
+          mkdir -p ~/.config/meme_generator
+          echo -e "[meme]\nload_builtin_memes = false" > ~/.config/meme_generator/config.toml
+
+      - name: Find changed memes
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          INPUT_MEMES: ${{ inputs.memes }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            names=$(git diff --name-only "$BASE_SHA" HEAD -- memes/ | cut -d/ -f2 | sort -u)
+            # 只改了预览脚本/workflow 时，预览全部表情
+            if [ -z "$names" ]; then names=$(ls memes); fi
+          elif [ -n "$INPUT_MEMES" ]; then
+            names="$INPUT_MEMES"
+          else
+            names=$(ls memes)
+          fi
+          dirs=""
+          for name in $names; do
+            # 跳过被删除的表情
+            if [ -d "memes/$name" ]; then dirs="$dirs memes/$name"; fi
+          done
+          echo "改动的表情：$dirs"
+          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+
+      - name: Generate previews
+        id: generate
+        continue-on-error: true
+        env:
+          IMAGE_PREFIX: https://github.com/${{ github.repository }}/raw/${{ env.PREVIEW_BRANCH }}/pr-${{ github.event.pull_request.number || 'manual' }}/${{ github.run_id }}-${{ github.run_attempt }}/
+        run: |
+          python3 .github/scripts/preview_memes.py \
+            --out preview \
+            --image-url-prefix "$IMAGE_PREFIX" \
+            ${{ steps.changed.outputs.dirs }}
+
+      - name: Upload preview artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meme-preview
+          path: preview/
+          if-no-files-found: ignore
+
+      - name: Push preview images
+        id: push
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        env:
+          PR_DIR: pr-${{ github.event.pull_request.number || 'manual' }}
+          RUN_DIR: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          shopt -s nullglob
+          files=(preview/*.gif preview/*.png preview/*.jpg preview/*.jpeg preview/*.webp)
+          if [ ${#files[@]} -eq 0 ]; then echo "没有图片需要上传"; exit 0; fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            rm -rf preview-branch
+            if git ls-remote --exit-code --heads origin "$PREVIEW_BRANCH" >/dev/null; then
+              git clone --depth 1 --branch "$PREVIEW_BRANCH" \
+                "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" preview-branch
+            else
+              mkdir preview-branch
+              git -C preview-branch init -b "$PREVIEW_BRANCH"
+              git -C preview-branch remote add origin \
+                "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+              echo "PR 表情预览图，由 .github/workflows/preview.yml 自动生成，可随时删除。" > preview-branch/README.md
+            fi
+            # 每个 PR 只保留最新一次的预览图
+            rm -rf "preview-branch/$PR_DIR"
+            mkdir -p "preview-branch/$PR_DIR/$RUN_DIR"
+            cp "${files[@]}" "preview-branch/$PR_DIR/$RUN_DIR/"
+            git -C preview-branch add -A
+            git -C preview-branch commit -q -m "preview: $PR_DIR ($RUN_DIR)"
+            if git -C preview-branch push origin "$PREVIEW_BRANCH"; then exit 0; fi
+            sleep $((i * 3))
+          done
+          exit 1
+
+      - name: Write job summary
+        if: always()
+        run: |
+          if [ -f preview/comment.md ]; then
+            cat preview/comment.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Comment on PR
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        env:
+          PUSH_OK: ${{ steps.push.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- meme-preview-comment -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            let body;
+            if (fs.existsSync('preview/comment.md')) {
+              body = fs.readFileSync('preview/comment.md', 'utf8');
+            } else {
+              body = '## 表情预览 ❌\n\n预览生成失败，请查看运行日志。\n';
+            }
+            if (process.env.PUSH_OK !== 'success') {
+              body += '\n> ⚠️ 预览图上传失败，图片可能无法显示，可在运行页面下载 artifact 查看。\n';
+            }
+            body = `${marker}\n${body}\n---\n[运行日志与 artifact](${runUrl}) · 提交 ${context.payload.pull_request.head.sha.slice(0, 7)}\n`;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number, body });
+            }
+
+      - name: Check result
+        if: steps.generate.outcome != 'success'
+        run: |
+          echo "::error::表情预览生成失败，详情见 PR 评论或 Job Summary"
+          exit 1
