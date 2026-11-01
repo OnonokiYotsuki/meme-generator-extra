@@ -15,7 +15,7 @@ from pydantic import Field
 
 img_dir = Path(__file__).parent / "images"
 
-help_text = "指定第一只猫（原图“up主”）的名字"
+help_text = "指定第一只猫的名字"
 
 
 class Model(MemeArgsModel):
