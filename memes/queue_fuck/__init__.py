@@ -72,7 +72,7 @@ def paste_center(bg: BuildImage, img: BuildImage, center: tuple[int, int]):
     bg.paste(img, (center[0] - img.width // 2, center[1] - img.height // 2), alpha=True)
 
 
-def queue_up(images: list[BuildImage], texts: list[str], args: Model):
+def queue_fuck(images: list[BuildImage], texts: list[str], args: Model):
     text = texts[0] if texts else "我干死你"
     name = args.name or (args.user_infos[0].name if args.user_infos else "") or "up主"
 
@@ -108,8 +108,8 @@ def queue_up(images: list[BuildImage], texts: list[str], args: Model):
 
 
 add_meme(
-    "queue_up",
-    queue_up,
+    "queue_fuck",
+    queue_fuck,
     min_images=1,
     max_images=5,
     min_texts=0,
