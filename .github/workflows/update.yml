@@ -26,8 +26,10 @@ jobs:
       - name: Checkout main repo
         uses: actions/checkout@v4
         with:
-          repository: OnonokiYotsuki/meme-generator
+          repository: MemeCrafters/meme-generator
+          ref: v0.1.14
           path: main
+          sparse-checkout: resources/fonts
 
       - name: Setup python
         uses: actions/setup-python@v5
