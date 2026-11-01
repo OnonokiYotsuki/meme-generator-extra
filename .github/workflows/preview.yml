@@ -5,6 +5,8 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "memes/**"
+      - ".github/workflows/preview.yml"
+      - ".github/scripts/preview_memes.py"
   workflow_dispatch:
     inputs:
       memes:
@@ -67,6 +69,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             names=$(git diff --name-only "$BASE_SHA" HEAD -- memes/ | cut -d/ -f2 | sort -u)
+            # 只改了预览脚本/workflow 时，预览全部表情
+            if [ -z "$names" ]; then names=$(ls memes); fi
           elif [ -n "$INPUT_MEMES" ]; then
             names="$INPUT_MEMES"
           else
